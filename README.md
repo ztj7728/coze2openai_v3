@@ -1,2 +1,1 @@
-支持reasoning_content的转发（独此一家）
-支持function_call和tool_response的转发（独此一家）
+支持reasoning_content/function_call/tool_response的转发
