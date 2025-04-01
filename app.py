@@ -2,6 +2,7 @@ from flask import Flask, request, Response, stream_with_context, jsonify
 import requests
 import json
 import time
+import uuid
 
 app = Flask(__name__)
 
@@ -69,6 +70,8 @@ def chat_completions():
     coze_response = requests.post(COZE_API_URL, json=coze_payload, headers=coze_headers, stream=True)
 
     def generate():
+        # 生成唯一的会话ID
+        chat_id = f"chatcmpl-{uuid.uuid4().hex[:10]}"
         current_event = None
         for line in coze_response.iter_lines():
             if line:
@@ -92,32 +95,32 @@ def chat_completions():
                                 try:
                                     function_data = json.loads(event_data.get("content", "{}"))
                                     chunk = {
-                                        "id": "chatcmpl-xxxxx",
+                                        "id": chat_id,
                                         "object": "chat.completion.chunk",
                                         "created": int(time.time()),
-                                        "model": "coze-proxy",
+                                        "model": coze_bot_id,
                                         "choices": [{
                                             "delta": {
                                                 "function_call": {
                                                     "name": function_data.get("name", ""),
-                                                    "arguments": json.dumps(function_data.get("arguments", {}))
+                                                    "arguments": json.dumps(function_data.get("arguments", {}), ensure_ascii=False)
                                                 }
                                             },
                                             "index": 0,
                                             "finish_reason": None
                                         }]
                                     }
-                                    yield "data: " + json.dumps(chunk) + "\n\n"
+                                    yield "data: " + json.dumps(chunk, ensure_ascii=False) + "\n\n"
                                 except json.JSONDecodeError:
                                     print("Error parsing function_call content")
                                     
                             # 处理工具响应
                             elif message_type == "tool_response":
                                 chunk = {
-                                    "id": "chatcmpl-xxxxx",
+                                    "id": chat_id,
                                     "object": "chat.completion.chunk",
                                     "created": int(time.time()),
-                                    "model": "coze-proxy",
+                                    "model": coze_bot_id,
                                     "choices": [{
                                         "delta": {
                                             "tool_response": event_data.get("content", "")
@@ -126,7 +129,7 @@ def chat_completions():
                                         "finish_reason": None
                                     }]
                                     }
-                                yield "data: " + json.dumps(chunk) + "\n\n"
+                                yield "data: " + json.dumps(chunk, ensure_ascii=False) + "\n\n"
                                 
                         elif current_event == "conversation.message.delta":
                             # 处理普通的文本消息
@@ -139,32 +142,32 @@ def chat_completions():
                                 delta_data["reasoning_content"] = reasoning_content
                             if delta_data:
                                 chunk = {
-                                    "id": "chatcmpl-xxxxx",
+                                    "id": chat_id,
                                     "object": "chat.completion.chunk",
                                     "created": int(time.time()),
-                                    "model": "coze-proxy",
+                                    "model": coze_bot_id,
                                     "choices": [{
                                         "delta": delta_data,
                                         "index": 0,
                                         "finish_reason": None
                                     }]
                                 }
-                                yield "data: " + json.dumps(chunk) + "\n\n"
+                                yield "data: " + json.dumps(chunk, ensure_ascii=False) + "\n\n"
                                 
                         # 当消息完全结束时
                         if current_event == "conversation.chat.completed":
                             chunk = {
-                                "id": "chatcmpl-xxxxx",
+                                "id": chat_id,
                                 "object": "chat.completion.chunk",
                                 "created": int(time.time()),
-                                "model": "coze-proxy",
+                                "model": coze_bot_id,
                                 "choices": [{
                                     "delta": {},
                                     "index": 0,
                                     "finish_reason": "stop"
                                 }]
                             }
-                            yield "data: " + json.dumps(chunk) + "\n\n"
+                            yield "data: " + json.dumps(chunk, ensure_ascii=False) + "\n\n"
                 except Exception as e:
                     print("Error processing line:", e)
         yield "data: [DONE]\n\n"
